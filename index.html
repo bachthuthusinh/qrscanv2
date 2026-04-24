@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Check-in CCCD</title>
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<script type="module">
+import QrScanner from "https://cdn.jsdelivr.net/npm/qr-scanner@1.4.2/qr-scanner.min.js";
+window.QrScanner = QrScanner;
+</script>
+
+<style>
+body {
+  margin:0;
+  font-family: Arial;
+  background:#111;
+  color:white;
+}
+
+header {
+  padding:10px;
+  text-align:center;
+  font-size:18px;
+  background:#000;
+}
+
+video {
+  width:100%;
+  height:60vh;
+  object-fit:cover;
+}
+
+.scan-box {
+  position:absolute;
+  top:15%;
+  left:50%;
+  transform:translateX(-50%);
+  width:260px;
+  height:260px;
+  border:3px solid #00ffcc;
+  border-radius:10px;
+}
+
+.card {
+  background:white;
+  color:black;
+  margin:10px;
+  padding:10px;
+  border-radius:10px;
+}
+
+.list {
+  max-height:150px;
+  overflow:auto;
+  font-size:13px;
+}
+
+button {
+  width:45%;
+  padding:12px;
+  margin:5px;
+  border:none;
+  border-radius:10px;
+  font-size:15px;
+}
+
+.start {background:#28a745;color:white;}
+.stop {background:#dc3545;color:white;}
+.reset {background:#ffc107;color:black;}
+
+</style>
+</head>
+
+<body>
+
+<header>📱 Check-in CCCD</header>
+
+<div style="position:relative;">
+  <video id="video"></video>
+  <div class="scan-box"></div>
+</div>
+
+<div class="card" id="info">Chưa có dữ liệu</div>
+
+<div style="text-align:center;">
+  <button class="start" onclick="startScan()">Start</button>
+  <button class="stop" onclick="stopScan()">Stop</button>
+  <button class="reset" onclick="reset()">Reset</button>
+</div>
+
+<div class="card">
+  <b>Danh sách đã quét:</b>
+  <div class="list" id="list"></div>
+</div>
+
+<script type="module">
+import QrScanner from "https://cdn.jsdelivr.net/npm/qr-scanner@1.4.2/qr-scanner.min.js";
+
+const apiUrl = "https://script.google.com/macros/s/AKfycbwpNz7FwXZILT2uSzzFGkyFGt0NqFqlioRMsoUm5ERL4R1-1Uvo0U0ZIKNDw7JJRys0/exec";
+
+let scanner;
+let scanned = false;
+let history = [];
+
+function parseCCCD(t){
+  let p = t.split("|");
+  return {
+    id:p[0],
+    name:p[2],
+    dob:p[3],
+    gender:p[4],
+    address:p[5]
+  };
+}
+
+function show(d){
+  document.getElementById("info").innerHTML =
+  `<b>${d.name}</b><br>${d.id}<br>${d.dob}`;
+}
+
+function addHistory(d){
+  history.unshift(d);
+  let html="";
+  history.slice(0,10).forEach(x=>{
+    html+=`${x.name} (${x.id})<br>`;
+  });
+  document.getElementById("list").innerHTML=html;
+}
+
+function send(d){
+  fetch(apiUrl,{
+    method:"POST",
+    body:JSON.stringify(d)
+  });
+}
+
+function beep(){
+  let ctx=new AudioContext();
+  let osc=ctx.createOscillator();
+  osc.connect(ctx.destination);
+  osc.start();
+  osc.stop(ctx.currentTime+0.1);
+}
+
+function startScan(){
+  scanner=new QrScanner(video, res=>{
+    if(scanned) return;
+    scanned=true;
+
+    let data=parseCCCD(res.data);
+
+    show(data);
+    addHistory(data);
+    send(data);
+
+    navigator.vibrate(200);
+    beep();
+
+    setTimeout(()=>scanned=false,3000);
+  });
+
+  scanner.start();
+}
+
+function stopScan(){
+  if(scanner) scanner.stop();
+}
+
+function reset(){
+  document.getElementById("info").innerHTML="Chưa có dữ liệu";
+}
+
+startScan();
+</script>
+
+</body>
+</html>
