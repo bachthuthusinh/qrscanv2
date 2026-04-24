@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Scan CCCD / VNeID</title>
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<script src="https://unpkg.com/html5-qrcode"></script>
+
+<style>
+body {
+  margin:0;
+  font-family: Arial;
+  background:#000;
+  color:white;
+}
+
+/* header */
+header {
+  text-align:center;
+  padding:10px;
+  font-size:18px;
+}
+
+/* camera */
+#reader {
+  width:100%;
+  height:60vh;
+}
+
+/* box info */
+.card {
+  background:white;
+  color:black;
+  margin:10px;
+  padding:12px;
+  border-radius:12px;
+  font-size:15px;
+}
+
+/* buttons */
+.controls {
+  text-align:center;
+}
+
+button {
+  width:45%;
+  padding:14px;
+  margin:5px;
+  border:none;
+  border-radius:10px;
+  font-size:16px;
+}
+
+.start { background:#28a745; color:white; }
+.stop { background:#dc3545; color:white; }
+
+/* manual input */
+input {
+  width:90%;
+  padding:10px;
+  margin:5px;
+  border-radius:8px;
+  border:none;
+}
+</style>
+</head>
+
+<body>
+
+<header>📱 Scan CCCD / VNeID</header>
+
+<div id="reader"></div>
+
+<div class="card" id="result">Chưa có dữ liệu</div>
+
+<div class="controls">
+  <button class="start" onclick="startScan()">▶ Start</button>
+  <button class="stop" onclick="stopScan()">⏹ Stop</button>
+</div>
+
+<div class="card">
+  <b>Fallback (dán QR nếu không scan được):</b><br>
+  <input id="manual" placeholder="Dán nội dung QR vào đây">
+  <button onclick="handleManual()">Xử lý</button>
+</div>
+
+<script>
+const apiUrl = "https://script.google.com/macros/s/AKfycbwpNz7FwXZILT2uSzzFGkyFGt0NqFqlioRMsoUm5ERL4R1-1Uvo0U0ZIKNDw7JJRys0/exec";
+
+let scanner;
+let scanned = false;
+
+/* parse CCCD */
+function parse(text) {
+  console.log("RAW:", text);
+
+  // nếu là JSON (VNeID)
+  try {
+    let obj = JSON.parse(text);
+    return {
+      id: obj.id || "",
+      name: obj.name || "",
+      dob: obj.dob || "",
+      gender: obj.gender || "",
+      address: obj.address || ""
+    };
+  } catch {}
+
+  // nếu là dạng CCCD |
+  let p = text.split("|");
+
+  return {
+    id: p[0] || "",
+    name: p[2] || "",
+    dob: p[3] || "",
+    gender: p[4] || "",
+    address: p[5] || ""
+  };
+}
+
+/* hiển thị */
+function show(d) {
+  document.getElementById("result").innerHTML =
+  `<b>${d.name}</b><br>
+   CCCD: ${d.id}<br>
+   Ngày sinh: ${d.dob}<br>
+   Giới tính: ${d.gender}<br>
+   ${d.address}`;
+}
+
+/* gửi sheet */
+function send(d) {
+  fetch(apiUrl, {
+    method:"POST",
+    body: JSON.stringify(d)
+  });
+}
+
+/* xử lý scan */
+function handle(text) {
+  if (scanned) return;
+  scanned = true;
+
+  const data = parse(text);
+
+  show(data);
+  send(data);
+
+  navigator.vibrate(200);
+
+  setTimeout(()=>scanned=false, 3000);
+}
+
+/* start */
+function startScan() {
+  scanner = new Html5Qrcode("reader");
+
+  scanner.start(
+    { facingMode: "environment" },
+    {
+      fps: 10,
+      qrbox: { width: 260, height: 260 }
+    },
+    (decodedText) => handle(decodedText)
+  );
+}
+
+/* stop */
+function stopScan() {
+  if (scanner) scanner.stop();
+}
+
+/* manual fallback */
+function handleManual() {
+  const text = document.getElementById("manual").value;
+  handle(text);
+}
+
+/* auto start */
+window.onload = () => {
+  startScan();
+};
+</script>
+
+</body>
+</html>
